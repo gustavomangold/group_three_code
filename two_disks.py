@@ -6,8 +6,8 @@ Time and motion parameters are illustrative, not fitted to experiments.
 
 Both disks propel themselves and diffuse. On contact, both turn away;
 the green disk temporarily reduces its angular diffusion (more persistence).
-Disk repulsion is a soft spring. A hard circular wall blocks outward motion
-without changing the heading. There are no periodic boundaries or adhesion.
+Disk and wall repulsion use the same soft spring: force = REPULSION * overlap.
+The wall pushes inward without changing the heading. No periodic boundaries.
 """
 
 import numpy as np
@@ -20,15 +20,21 @@ from matplotlib.patches import Circle
 DISK_DIAMETER = 10.0                 # Physical length represented by one unit
 ARENA_DIAMETER = 6.0                # In disk diameters
 SPEED = 1.0                         # Disk diameters per time unit
-REPULSION = 50.0                   # Spring strength / mobility
+REPULSION = 30.0                   # Spring strength / mobility
 #TRANSLATIONAL_DIFFUSION = 0.02      # Disk diameters squared per time unit
 ANGULAR_DIFFUSION = 10             # Radians squared per time unit
 #PERSISTENT_DIFFUSION = 0.01         # Green disk after contact
 #PERSISTENCE_TIME = 2.0
 DT = 0.001
-DURATION = 20.0
-SAVE_EVERY = 40                     # One animation frame per 40 steps
+DURATION = 100.0
+SAVE_EVERY = 500                     # One animation frame per 500 steps
 SEED = 7
+MU = 1
+
+
+def repulsive_force(overlap, normal):
+    """Same spring law for disk contact and wall contact."""
+    return REPULSION * max(0.0, overlap) * normal
 
 
 def simulate():
@@ -38,7 +44,7 @@ def simulate():
     positions = np.array([[-1.0, 0.0], [1.0, 0.0]])
     angles = np.array([0.0, np.pi])
     persistent_left = 0.0
-    # Disk centers must stay half a disk diameter inside the arena wall.
+    # Wall contact begins half a disk diameter inside the arena boundary.
     center_limit = ARENA_DIAMETER / 2 - 0.5
     times, tracks, persistent = [0.0], [positions.copy()], [False]
 
@@ -51,7 +57,7 @@ def simulate():
         forces = np.zeros((2, 2))
 
         if distance < 1.0:  # Contact: one disk diameter between centers
-            forces[0] = REPULSION * (1.0 - distance) * normal
+            forces[0] = repulsive_force(1.0 - distance, normal)
             forces[1] = -forces[0]
             away = np.arctan2(normal[1], normal[0])
             angles[:] = [away, away + np.pi]
@@ -59,15 +65,23 @@ def simulate():
             #if persistent_left == 0.0:
             #    persistent_left = PERSISTENCE_TIME
 
+        disk_distances = np.linalg.norm(positions, axis=1)
+
+        for i in range(2):
+            if disk_distances[i] > center_limit:
+                penetration = disk_distances[i] - center_limit
+                inward = - positions[i] / disk_distances[i]
+                forces[i] += repulsive_force(penetration, inward)
+
         directions = np.column_stack((np.cos(angles), np.sin(angles)))
         # Euler-Maruyama: drift * dt + sqrt(2 * diffusion * dt) * normal noise.
-        positions += (SPEED * directions + forces) * DT
+        positions += (SPEED * directions + MU * forces) * DT
         #positions += np.sqrt(2 * TRANSLATIONAL_DIFFUSION * DT) * rng.normal(size=(2, 2))
 
         # Project centers back onto the allowed circle: a sliding hard wall.
-        radii = np.linalg.norm(positions, axis=1)
-        outside = radii > center_limit
-        positions[outside] *= (center_limit / radii[outside])[:, None]
+        
+        #outside = radii > center_limit
+        #positions[outside] *= (center_limit / radii[outside])[:, None 
 
         angular_diffusion = np.array([
             ANGULAR_DIFFUSION,
