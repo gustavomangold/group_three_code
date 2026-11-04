@@ -31,8 +31,8 @@ ANGULAR_DIFFUSION = 10             # Radians squared per time unit
 PERSISTENCE_TIME = 2.0
 DT = 0.001
 
-STEP_SEPARATION = 10
-STEADY_STATE_STEPS = 1000
+STEP_SEPARATION = 5
+STEADY_STATE_STEPS = 1000000
 
 DURATION = 100.0
 SAVE_EVERY = 20                     # One animation frame per 500 steps
@@ -56,9 +56,9 @@ def simulate():
     center_limit = ARENA_DIAMETER / 2 - 0.5
     times, tracks, persistent = [0.0], [positions.copy()], [False]
 
-    separations = np.array([])
+    separations = []
 
-    for step in range(1, round(DURATION / DT) + 1):
+    for step in range(1, round(DURATION / DT) + STEADY_STATE_STEPS + 1):
         persistent_left = max(0.0, persistent_left - DT)
         separation = positions[0] - positions[1]
         distance = np.linalg.norm(separation)
@@ -105,7 +105,7 @@ def simulate():
 
         if step >= STEADY_STATE_STEPS:
             if step % STEP_SEPARATION == 0:
-                separations = np.append(separations, distance)
+                separations.append(distance)
 
         if step % SAVE_EVERY == 0 or step == round(DURATION / DT):
             times.append(step * DT)
@@ -150,13 +150,24 @@ if __name__ == "__main__":
     parser.add_argument("--ANIMATE", "--animate", type=bool,
                             default=False,
                             help="Display animation (default: %(default)s)")
+    parser.add_argument("--STEADY_STATE_STEPS", "--steady-state-steps", type=int,
+                        default=STEADY_STATE_STEPS,
+                        help="Steps discarded before sampling (default: %(default)s)")
+    parser.add_argument("--DURATION", "--duration", type=float, default=DURATION,
+                        help="Simulation duration (default: %(default)s)")
     args = parser.parse_args()
     if not np.isfinite(args.L) or args.L <= 1:
         parser.error("L must be finite and greater than 1 disk diameter")
     if not np.isfinite(args.PERSISTENCE_TIME) or args.PERSISTENCE_TIME < 0:
         parser.error("PERSISTENCE_TIME must be finite and nonnegative")
+    if not np.isfinite(args.DURATION) or args.DURATION <= 0:
+        parser.error("DURATION must be finite and positive")
+    if args.STEADY_STATE_STEPS < 0:
+        parser.error("STEADY_STATE_STEPS must be nonnegative")
     ARENA_DIAMETER = args.L
     PERSISTENCE_TIME = args.PERSISTENCE_TIME
+    STEADY_STATE_STEPS = args.STEADY_STATE_STEPS
+    DURATION = args.DURATION
     results = simulate()
     if args.ANIMATE:
         animation = animate(*results)
