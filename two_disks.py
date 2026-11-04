@@ -24,7 +24,7 @@ REPULSION = 100.0                   # Spring strength / mobility
 TRANSLATIONAL_DIFFUSION = 0.02      # Disk diameters squared per time unit
 ANGULAR_DIFFUSION = 0.5             # Radians squared per time unit
 PERSISTENT_DIFFUSION = 0.01         # Green disk after contact
-PERSISTENCE_TIME = 2.0
+#PERSISTENCE_TIME = 2.0
 DT = 0.001
 DURATION = 20.0
 SAVE_EVERY = 40                     # One animation frame per 40 steps
@@ -56,8 +56,8 @@ def simulate():
             away = np.arctan2(normal[1], normal[0])
             angles[:] = [away, away + np.pi]
             # Like the repo, contacts do not refresh an active persistence timer.
-            if persistent_left == 0.0:
-                persistent_left = PERSISTENCE_TIME
+            #if persistent_left == 0.0:
+            #    persistent_left = PERSISTENCE_TIME
 
         directions = np.column_stack((np.cos(angles), np.sin(angles)))
         # Euler-Maruyama: drift * dt + sqrt(2 * diffusion * dt) * normal noise.
@@ -70,7 +70,7 @@ def simulate():
         positions[outside] *= (center_limit / radii[outside])[:, None]
 
         angular_diffusion = np.array([
-            PERSISTENT_DIFFUSION if persistent_left > 0 else ANGULAR_DIFFUSION,
+            ANGULAR_DIFFUSION,
             ANGULAR_DIFFUSION,
         ])
         angles += np.sqrt(2 * angular_diffusion * DT) * rng.normal(size=2)
@@ -78,12 +78,12 @@ def simulate():
         if step % SAVE_EVERY == 0 or step == round(DURATION / DT):
             times.append(step * DT)
             tracks.append(positions.copy())
-            persistent.append(persistent_left > 0)
+            #persistent.append(persistent_left > 0)
 
-    return np.array(times), np.array(tracks), np.array(persistent)
+    return np.array(times), np.array(tracks)
 
 
-def animate(times, tracks, persistent):
+def animate(times, tracks):
     """Show the arena; purple means the green disk has increased persistence."""
     fig, ax = plt.subplots(figsize=(6, 6))
     radius = ARENA_DIAMETER / 2
@@ -99,7 +99,7 @@ def animate(times, tracks, persistent):
     def update(frame):
         for i, disk in enumerate(disks):
             disk.center = tracks[frame, i]
-        disks[0].set_color("tab:purple" if persistent[frame] else "tab:green")
+        # disks[0].set_color("tab:purple" if persistent[frame] else "tab:green")
         title.set_text(f"t = {times[frame]:.2f} | arena diameter = 6D, D = {DISK_DIAMETER:g}")
         return *disks, title
 
