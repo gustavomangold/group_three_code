@@ -20,10 +20,10 @@ from matplotlib.patches import Circle
 DISK_DIAMETER = 10.0                 # Physical length represented by one unit
 ARENA_DIAMETER = 6.0                # In disk diameters
 SPEED = 1.0                         # Disk diameters per time unit
-REPULSION = 100.0                   # Spring strength / mobility
-TRANSLATIONAL_DIFFUSION = 0.02      # Disk diameters squared per time unit
-ANGULAR_DIFFUSION = 0.5             # Radians squared per time unit
-PERSISTENT_DIFFUSION = 0.01         # Green disk after contact
+REPULSION = 50.0                   # Spring strength / mobility
+#TRANSLATIONAL_DIFFUSION = 0.02      # Disk diameters squared per time unit
+ANGULAR_DIFFUSION = 10             # Radians squared per time unit
+#PERSISTENT_DIFFUSION = 0.01         # Green disk after contact
 #PERSISTENCE_TIME = 2.0
 DT = 0.001
 DURATION = 20.0
@@ -62,7 +62,7 @@ def simulate():
         directions = np.column_stack((np.cos(angles), np.sin(angles)))
         # Euler-Maruyama: drift * dt + sqrt(2 * diffusion * dt) * normal noise.
         positions += (SPEED * directions + forces) * DT
-        positions += np.sqrt(2 * TRANSLATIONAL_DIFFUSION * DT) * rng.normal(size=(2, 2))
+        #positions += np.sqrt(2 * TRANSLATIONAL_DIFFUSION * DT) * rng.normal(size=(2, 2))
 
         # Project centers back onto the allowed circle: a sliding hard wall.
         radii = np.linalg.norm(positions, axis=1)
