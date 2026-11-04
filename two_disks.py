@@ -11,6 +11,7 @@ The wall pushes inward without changing the heading. No periodic boundaries.
 """
 
 import argparse
+from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,9 +26,14 @@ SPEED = 1.0                         # Disk diameters per time unit
 REPULSION = 30.0                   # Spring strength / mobility
 #TRANSLATIONAL_DIFFUSION = 0.02      # Disk diameters squared per time unit
 ANGULAR_DIFFUSION = 10             # Radians squared per time unit
+ 
 #PERSISTENT_DIFFUSION = 0.01         # Green disk after contact
 PERSISTENCE_TIME = 2.0
 DT = 0.001
+
+STEP_SEPARATION = 10
+STEADY_STATE_STEPS = 1000
+
 DURATION = 100.0
 SAVE_EVERY = 20                     # One animation frame per 500 steps
 SEED = 7
@@ -49,6 +55,8 @@ def simulate():
     # Wall contact begins half a disk diameter inside the arena boundary.
     center_limit = ARENA_DIAMETER / 2 - 0.5
     times, tracks, persistent = [0.0], [positions.copy()], [False]
+
+    separations = np.array([])
 
     for step in range(1, round(DURATION / DT) + 1):
         persistent_left = max(0.0, persistent_left - DT)
@@ -95,15 +103,19 @@ def simulate():
         ])
         angles += np.sqrt(2 * angular_diffusion * DT) * rng.normal(size=2)
 
+        if step >= STEADY_STATE_STEPS:
+            if step % STEP_SEPARATION == 0:
+                separations = np.append(separations, distance)
+
         if step % SAVE_EVERY == 0 or step == round(DURATION / DT):
             times.append(step * DT)
             tracks.append(positions.copy())
             persistent.append(persistent_left > 0)
 
-    return np.array(times), np.array(tracks), np.array(persistent)
+    return np.array(times), np.array(tracks), np.array(persistent), np.array(separations)
 
 
-def animate(times, tracks, persistent):
+def animate(times, tracks, persistent, separations):
     """Show the arena; purple means the green disk has increased persistence."""
     fig, ax = plt.subplots(figsize=(6, 6))
     radius = ARENA_DIAMETER / 2
@@ -122,7 +134,7 @@ def animate(times, tracks, persistent):
         disks[0].set_color("tab:purple" if persistent[frame] else "tab:green")
         title.set_text(f"t = {times[frame]:.2f} | arena diameter = {ARENA_DIAMETER:g}D, D = {DISK_DIAMETER:g}")
         return *disks, title
-
+    
     animation = FuncAnimation(fig, update, frames=len(times), interval=40, blit=True)
     plt.show()
     return animation
@@ -145,4 +157,20 @@ if __name__ == "__main__":
         parser.error("PERSISTENCE_TIME must be finite and nonnegative")
     ARENA_DIAMETER = args.L
     PERSISTENCE_TIME = args.PERSISTENCE_TIME
-    animation = animate(*simulate())
+    results = simulate()
+    if args.ANIMATE:
+        animation = animate(*results)
+    separations = results[3]
+    if separations.size:
+        plt.figure()
+        bins = np.arange(0, separations.max() + 0.05, 0.05)
+        plt.hist(separations, bins=bins, edgecolor="black")
+        plt.xlabel("Separation / disk diameter")
+        plt.ylabel("Count")
+        plt.figtext(0.5, 0.02, f"Mean separation = {separations.mean():.3f} disk diameters",
+                    ha="center")
+        plt.tight_layout(rect=(0, 0.06, 1, 1))
+        data_dir = Path(__file__).resolve().parent / "data"
+        data_dir.mkdir(exist_ok=True)
+        plt.savefig(data_dir / f"separations_L{ARENA_DIAMETER:g}_tau{PERSISTENCE_TIME:g}.png")
+        #plt.show()
