@@ -11,9 +11,6 @@ import csv
 from multiprocessing import get_context
 from pathlib import Path
 
-import matplotlib
-matplotlib.use("Agg")  # Save plots without a display on the cluster.
-import matplotlib.pyplot as plt
 import numpy as np
 import two_disks as simulation
 
@@ -61,7 +58,7 @@ def run_sweep(workers=10):
                 print(f"Finished L={length}, tau={tau:g}: {SAMPLES} samples", flush=True)
 
 
-def plot_results():
+def plot_results(make_plot=True):
     # Read the saved CSV so plotting uses exactly the recorded measurements.
     groups = {}
     with (DATA_DIR / "sweep_samples.csv").open() as file:
@@ -69,7 +66,11 @@ def plot_results():
             key = (float(row["L"]), float(row["tau"]))
             groups.setdefault(key, []).append(float(row["separation_over_L"]))
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    if make_plot:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(8, 5))
     with (DATA_DIR / "sweep_means.csv").open("w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["L", "tau", "samples", "mean_separation_over_L"])
@@ -80,21 +81,29 @@ def plot_results():
                 values = groups[length, tau]
                 means.append(np.mean(values))
                 writer.writerow([length, tau, len(values), means[-1]])
-            ax.plot(taus, means, "o-", markersize=3, label=f"L={length:g}")
-    ax.set(xlabel="τ", ylabel="Mean separation / L")
-    ax.legend(title="Arena diameter", ncol=2)
-    fig.tight_layout()
-    fig.savefig(DATA_DIR / "sweep_L_tau.png", dpi=150)
-    plt.close(fig)
+            if make_plot:
+                ax.plot(taus, means, "o-", markersize=3, label=f"L={length:g}")
+    if make_plot:
+        ax.set(xlabel="τ", ylabel="Mean separation / L")
+        ax.legend(title="Arena diameter", ncol=2)
+        fig.tight_layout()
+        fig.savefig(DATA_DIR / "sweep_L_tau.png", dpi=150)
+        plt.close(fig)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=10,
                         help="Parallel sample processes on one node (default: 10)")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--no-plot", action="store_true",
+                      help="Save both CSV files without needing Matplotlib")
+    mode.add_argument("--plot-only", action="store_true",
+                      help="Plot the existing CSV without running simulations")
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("workers must be at least 1")
-    run_sweep(args.workers)
-    plot_results()
-    print(f"Saved CSV files and plot in {DATA_DIR}")
+    if not args.plot_only:
+        run_sweep(args.workers)
+    plot_results(make_plot=not args.no_plot)
+    print(f"Saved CSV files{' and plot' if not args.no_plot else ''} in {DATA_DIR}")

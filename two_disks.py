@@ -14,9 +14,6 @@ import argparse
 from pathlib import Path
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from matplotlib.patches import Circle
 
 
 # Edit these parameters to explore the model. Mobility is set to one.
@@ -117,6 +114,10 @@ def simulate():
 
 def animate(times, tracks, persistent, separations):
     """Show the arena; purple means the green disk has increased persistence."""
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+    from matplotlib.patches import Circle
+
     fig, ax = plt.subplots(figsize=(6, 6))
     radius = ARENA_DIAMETER / 2
     ax.add_patch(Circle((0, 0), radius, fill=False, color="black"))
@@ -173,6 +174,8 @@ if __name__ == "__main__":
         animation = animate(*results)
     separations = results[3]
     if separations.size:
+        import matplotlib.pyplot as plt
+
         plt.figure()
         bins = np.arange(0, separations.max() + 0.05, 0.05)
         plt.hist(separations, bins=bins, edgecolor="black")
