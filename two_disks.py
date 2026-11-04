@@ -1,7 +1,7 @@
 """Two active disks in a circular arena, inspired by cell_simulation.
 
-Run: python3 two_disks.py (requires numpy and matplotlib).
-Lengths below are in disk diameters: D=10 physically, arena diameter=6D=60.
+Run: python3 two_disks.py --L 6 --PERSISTENCE_TIME 2 (requires numpy and matplotlib).
+Lengths below are in disk diameters: D=10 physically, arena diameter=L*D.
 Time and motion parameters are illustrative, not fitted to experiments.
 
 Both disks propel themselves and diffuse. On contact, both turn away;
@@ -9,6 +9,8 @@ the green disk temporarily reduces its angular diffusion (more persistence).
 Disk and wall repulsion use the same soft spring: force = REPULSION * overlap.
 The wall pushes inward without changing the heading. No periodic boundaries.
 """
+
+import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,7 +29,7 @@ ANGULAR_DIFFUSION = 10             # Radians squared per time unit
 PERSISTENCE_TIME = 2.0
 DT = 0.001
 DURATION = 100.0
-SAVE_EVERY = 500                     # One animation frame per 500 steps
+SAVE_EVERY = 20                     # One animation frame per 500 steps
 SEED = 7
 MU = 1
 
@@ -83,9 +85,13 @@ def simulate():
         #outside = radii > center_limit
         #positions[outside] *= (center_limit / radii[outside])[:, None 
 
+        angular_diffusion_green = ANGULAR_DIFFUSION
+        if persistent_left > 0:
+            angular_diffusion_green = 0.0
+
         angular_diffusion = np.array([
-            ANGULAR_DIFFUSION,
-            ANGULAR_DIFFUSION,
+            angular_diffusion_green,
+            ANGULAR_DIFFUSION
         ])
         angles += np.sqrt(2 * angular_diffusion * DT) * rng.normal(size=2)
 
@@ -114,7 +120,7 @@ def animate(times, tracks, persistent):
         for i, disk in enumerate(disks):
             disk.center = tracks[frame, i]
         disks[0].set_color("tab:purple" if persistent[frame] else "tab:green")
-        title.set_text(f"t = {times[frame]:.2f} | arena diameter = 6D, D = {DISK_DIAMETER:g}")
+        title.set_text(f"t = {times[frame]:.2f} | arena diameter = {ARENA_DIAMETER:g}D, D = {DISK_DIAMETER:g}")
         return *disks, title
 
     animation = FuncAnimation(fig, update, frames=len(times), interval=40, blit=True)
@@ -123,4 +129,20 @@ def animate(times, tracks, persistent):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--L", type=float, default=ARENA_DIAMETER,
+                        help="Arena diameter in disk diameters (default: %(default)s)")
+    parser.add_argument("--PERSISTENCE_TIME", "--persistence-time", type=float,
+                        default=PERSISTENCE_TIME,
+                        help="Persistence duration after contact (default: %(default)s)")
+    parser.add_argument("--ANIMATE", "--animate", type=bool,
+                            default=False,
+                            help="Display animation (default: %(default)s)")
+    args = parser.parse_args()
+    if not np.isfinite(args.L) or args.L <= 1:
+        parser.error("L must be finite and greater than 1 disk diameter")
+    if not np.isfinite(args.PERSISTENCE_TIME) or args.PERSISTENCE_TIME < 0:
+        parser.error("PERSISTENCE_TIME must be finite and nonnegative")
+    ARENA_DIAMETER = args.L
+    PERSISTENCE_TIME = args.PERSISTENCE_TIME
     animation = animate(*simulate())
