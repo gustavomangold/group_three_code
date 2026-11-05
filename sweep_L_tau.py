@@ -1,7 +1,7 @@
 """Run: python3 sweep_L_tau.py --workers 10. Requires only NumPy.
 
 Save all recorded separations for 10 independent runs per (L, tau),
-one CSV per parameter pair in data/sweep_L_tau/. Plot separately with
+one CSV per parameter pair in data/periodic/sweep_L_tau/. Plot separately with
 python3 plot_sweep_L_tau.py. Motion settings come from two_disks.py.
 Rerunning resumes completed samples; keep the same simulation settings.
 """
@@ -19,7 +19,7 @@ import two_disks as simulation
 L_VALUES = [2, 3, 4, 5, 6, 8, 10]
 TAU_VALUES = np.arange(0, 3.01, 0.25)
 SAMPLES = 10
-DATA_DIR = Path(__file__).resolve().parent / "data" / "sweep_L_tau"
+DATA_DIR = Path(__file__).resolve().parent / "data" / "periodic" / "sweep_L_tau"
 HEADER = ["L", "tau", "sample", "seed", "step", "time",
           "separation", "separation_over_L"]
 
@@ -69,7 +69,7 @@ def run_sample(task):
     # Each process has its own simulation parameters and random generator.
     for name, value in settings.items():
         setattr(simulation, name, value)
-    simulation.ARENA_DIAMETER = length
+    simulation.BOX_SIZE = length
     simulation.PERSISTENCE_TIME = tau
     simulation.SEED = seed
     separations = simulation.simulate()[3]

@@ -20,14 +20,14 @@ def main():
     simulation.DURATION = TOTAL_STEPS * simulation.DT
     simulation.STEADY_STATE_STEPS = 0
     simulation.SAVE_EVERY = TOTAL_STEPS  # No animation frames needed for this check.
-    print(f"Running {TOTAL_STEPS:,} steps: L={simulation.ARENA_DIAMETER:g}, "
+    print(f"Running {TOTAL_STEPS:,} steps: L={simulation.BOX_SIZE:g}, "
           f"tau={simulation.PERSISTENCE_TIME:g}, seed={simulation.SEED}", flush=True)
     separations = simulation.simulate()[3]
     sample_steps = np.arange(1, len(separations) + 1) * simulation.STEP_SEPARATION
     means = [separations[sample_steps >= cutoff].mean() for cutoff in CUTOFFS]
 
-    data_dir = Path(__file__).resolve().parent / "data"
-    data_dir.mkdir(exist_ok=True)
+    data_dir = Path(__file__).resolve().parent / "data" / "periodic"
+    data_dir.mkdir(parents=True, exist_ok=True)
     with (data_dir / "steady_state_check_1M_10M.csv").open("w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["steady_state_steps", "samples", "mean_separation"])
@@ -37,7 +37,7 @@ def main():
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(CUTOFFS, means, "o-")
     ax.set(xlabel="Steady-state steps discarded", ylabel="Mean separation / disk diameter",
-           title=f"L={simulation.ARENA_DIAMETER:g}, τ={simulation.PERSISTENCE_TIME:g}, "
+           title=f"L={simulation.BOX_SIZE:g}, τ={simulation.PERSISTENCE_TIME:g}, "
                  f"seed={simulation.SEED}")
     ax.grid(alpha=0.3)
     fig.tight_layout()
