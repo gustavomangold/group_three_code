@@ -26,8 +26,8 @@ def main():
     sample_steps = np.arange(1, len(separations) + 1) * simulation.STEP_SEPARATION
     means = [separations[sample_steps >= cutoff].mean() for cutoff in CUTOFFS]
 
-    data_dir = Path(__file__).resolve().parent / "data"
-    data_dir.mkdir(exist_ok=True)
+    data_dir = Path(__file__).resolve().parent / "data" / "paper_params"
+    data_dir.mkdir(parents=True, exist_ok=True)
     with (data_dir / "steady_state_check_1M_10M.csv").open("w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["steady_state_steps", "samples", "mean_separation"])

@@ -42,7 +42,7 @@ STEP_SEPARATION = 50                # Same sampling interval as before: 0.005
 STEADY_STATE_STEPS = 2000000        # Warm-up duration: 200 at the current DT
 
 DURATION = 100.0
-SAVE_EVERY = 200                    # Same frame interval as before: 0.02
+SAVE_EVERY = 2000                    # Same frame interval as before: 0.02
 SEED = 7
 MU = 1
 
