@@ -36,7 +36,7 @@ ANGULAR_DIFFUSION = 360.0           # Paper D/Pe
 PERSISTENT_DIFFUSION = 0.0          # Ballistic activated green disk
 REORIENT_ON_CONTACT = False         # Fig. 4 excludes contact-induced turning
 PERSISTENCE_TIME = 2.0
-DT = 0.0001                        # Resolve the faster angular diffusion
+DT = 0.00001                        # Resolve the faster angular diffusion
 
 STEP_SEPARATION = 50                # Same sampling interval as before: 0.005
 STEADY_STATE_STEPS = 2000000        # Warm-up duration: 200 at the current DT
@@ -144,7 +144,9 @@ def animate(times, tracks, persistent, separations):
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation
     from matplotlib.patches import Circle
+    from velocity_arrows import motion_velocities, add_velocity_arrows, arrow_components
 
+    velocities = motion_velocities(times, tracks)
     fig, ax = plt.subplots(figsize=(6, 6))
     radius = ARENA_DIAMETER / 2
     ax.add_patch(Circle((0, 0), radius, fill=False, color="black"))
@@ -154,14 +156,17 @@ def animate(times, tracks, persistent, separations):
              for i, color in enumerate(["tab:green", "tab:red"])]
     for disk in disks:
         ax.add_patch(disk)
+    arrows = add_velocity_arrows(ax, tracks[0], velocities[0])
     title = ax.set_title("")
 
     def update(frame):
         for i, disk in enumerate(disks):
             disk.center = tracks[frame, i]
         disks[0].set_color("tab:purple" if persistent[frame] else "tab:green")
+        arrows.set_offsets(tracks[frame])
+        arrows.set_UVC(*arrow_components(velocities[frame]))
         title.set_text(f"t = {times[frame]:.2f} | arena diameter = {ARENA_DIAMETER:g}D, D = {DISK_DIAMETER:g}")
-        return *disks, title
+        return *disks, arrows, title
     
     animation = FuncAnimation(fig, update, frames=len(times), interval=40, blit=True)
     plt.show()
