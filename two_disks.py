@@ -1,13 +1,15 @@
 """Two active disks in a circular arena, inspired by cell_simulation.
 
-Run: python3 two_disks.py --L 6 --PERSISTENCE_TIME 2 (requires numpy and matplotlib).
+Run: python3 two_disks.py --PERSISTENCE_TIME 2 (requires numpy and matplotlib).
 Lengths below are in disk diameters: D=10 physically, arena diameter=L*D.
-Time and motion parameters are illustrative, not fitted to experiments.
+Fig. 4b parameters, with time rescaled by Pe=1000 so that SPEED=1.
+Paper: Pe=k=1000, D=360000, D+=0, tau=0.002, packing fraction=0.4.
+The two-particle circular confinement remains an approximation to the paper.
+Optional acceleration: install numba>=0.59; otherwise the NumPy version runs.
 
-Both disks propel themselves and diffuse. On contact, both turn away;
-the green disk temporarily reduces its angular diffusion (more persistence).
-Disk and wall repulsion use the same soft spring: force = REPULSION * overlap.
-The wall pushes inward without changing the heading. No periodic boundaries.
+Both disks propel themselves and diffuse. Contact activates persistence in
+the green disk, without turning either disk (Fig. 4 isolates persistence).
+Disk and wall forces are soft springs, with separate stiffnesses.
 """
 
 import argparse
@@ -15,35 +17,58 @@ from pathlib import Path
 
 import numpy as np
 
+try:
+    from _two_disks_numba import simulate_kernel as _simulate_kernel
+except ModuleNotFoundError as error:
+    if error.name != "numba":
+        raise
+    _simulate_kernel = None
+
 
 # Edit these parameters to explore the model. Mobility is set to one.
 DISK_DIAMETER = 10.0      # Physical length represented by one unit
-ARENA_DIAMETER = 5.0                # In disk diameters
+ARENA_DIAMETER = np.sqrt(5.0)        # Nominal area fraction 2/L^2 = 0.4
 SPEED = 1.0                         # Disk diameters per time unit
-REPULSION = 30.0                   # Spring strength / mobility
-#TRANSLATIONAL_DIFFUSION = 0.02      # Disk diameters squared per time unit
-ANGULAR_DIFFUSION = 10             # Radians squared per time unit
- 
-#PERSISTENT_DIFFUSION = 0.01         # Green disk after contact
+REPULSION = 1.0                     # Paper k/Pe; mobility remains one
+WALL_REPULSION = 30.0               # Preserve confinement when reducing disk stiffness
+TRANSLATIONAL_DIFFUSION = 0.001     # Paper translational diffusion / Pe
+ANGULAR_DIFFUSION = 360.0           # Paper D/Pe
+PERSISTENT_DIFFUSION = 0.0          # Ballistic activated green disk
+REORIENT_ON_CONTACT = False         # Fig. 4 excludes contact-induced turning
 PERSISTENCE_TIME = 2.0
-DT = 0.001
+DT = 0.0001                        # Resolve the faster angular diffusion
 
-STEP_SEPARATION = 5
-STEADY_STATE_STEPS = 1000000
+STEP_SEPARATION = 50                # Same sampling interval as before: 0.005
+STEADY_STATE_STEPS = 2000000        # Warm-up duration: 200 at the current DT
 
 DURATION = 100.0
-SAVE_EVERY = 20                     # One animation frame per 500 steps
+SAVE_EVERY = 200                    # Same frame interval as before: 0.02
 SEED = 7
 MU = 1
 
 
-def repulsive_force(overlap, normal):
-    """Same spring law for disk contact and wall contact."""
-    return REPULSION * max(0.0, overlap) * normal
+def repulsive_force(overlap, normal, strength=None):
+    """Soft spring, with disk stiffness unless another strength is supplied."""
+    if strength is None:
+        strength = REPULSION
+    return strength * max(0.0, overlap) * normal
 
 
 def simulate():
     """Return times, positions (frame, disk, xy), and green persistence flags."""
+    if _simulate_kernel is None:
+        return _simulate_python()
+    return _simulate_kernel(
+        np.random.default_rng(SEED), ARENA_DIAMETER, SPEED, REPULSION,
+        ANGULAR_DIFFUSION, PERSISTENCE_TIME, DT, DURATION,
+        STEADY_STATE_STEPS, STEP_SEPARATION, SAVE_EVERY, MU,
+        TRANSLATIONAL_DIFFUSION, PERSISTENT_DIFFUSION,
+        REORIENT_ON_CONTACT, WALL_REPULSION,
+    )
+
+
+def _simulate_python():
+    """Readable NumPy reference and fallback for the compiled version."""
     rng = np.random.default_rng(SEED)
     # Disk 0 is green, disk 1 is red; initially they face each other.
     positions = np.array([[-1.0, 0.0], [1.0, 0.0]])
@@ -65,9 +90,10 @@ def simulate():
 
         if distance < 1.0:  # Contact: one disk diameter between centers
             forces[0] = repulsive_force(1.0 - distance, normal)
-            forces[1] = -forces[0]
-            away = np.arctan2(normal[1], normal[0])
-            angles[:] = [away, away + np.pi]
+            forces[1] = - forces[0]
+            if REORIENT_ON_CONTACT:
+                away = np.arctan2(normal[1], normal[0])
+                angles[:] = [away, away + np.pi]
             # Like the repo, contacts do not refresh an active persistence timer.
             if persistent_left == 0.0:
                 persistent_left = PERSISTENCE_TIME
@@ -78,12 +104,13 @@ def simulate():
             if disk_distances[i] > center_limit:
                 penetration = disk_distances[i] - center_limit
                 inward = - positions[i] / disk_distances[i]
-                forces[i] += repulsive_force(penetration, inward)
+                forces[i] += repulsive_force(penetration, inward, WALL_REPULSION)
 
         directions = np.column_stack((np.cos(angles), np.sin(angles)))
         # Euler-Maruyama: drift * dt + sqrt(2 * diffusion * dt) * normal noise.
         positions += (SPEED * directions + MU * forces) * DT
-        #positions += np.sqrt(2 * TRANSLATIONAL_DIFFUSION * DT) * rng.normal(size=(2, 2))
+        if TRANSLATIONAL_DIFFUSION > 0:
+            positions += np.sqrt(2 * TRANSLATIONAL_DIFFUSION * DT) * rng.normal(size=(2, 2))
 
         # Project centers back onto the allowed circle: a sliding hard wall.
         
@@ -92,7 +119,7 @@ def simulate():
 
         angular_diffusion_green = ANGULAR_DIFFUSION
         if persistent_left > 0:
-            angular_diffusion_green = 0.0
+            angular_diffusion_green = PERSISTENT_DIFFUSION
 
         angular_diffusion = np.array([
             angular_diffusion_green,
@@ -184,7 +211,7 @@ if __name__ == "__main__":
         plt.figtext(0.5, 0.02, f"Mean separation = {separations.mean():.3f} disk diameters",
                     ha="center")
         plt.tight_layout(rect=(0, 0.06, 1, 1))
-        data_dir = Path(__file__).resolve().parent / "data"
-        data_dir.mkdir(exist_ok=True)
+        data_dir = Path(__file__).resolve().parent / "data" / "paper_params"
+        data_dir.mkdir(parents=True, exist_ok=True)
         plt.savefig(data_dir / f"separations_L{ARENA_DIAMETER:g}_tau{PERSISTENCE_TIME:g}.png")
         #plt.show()
